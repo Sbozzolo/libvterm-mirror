@@ -1,0 +1,56 @@
+name: Mirror
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron:  '0 1 * * *'
+
+jobs:
+
+  Mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y bzr
+
+      - name: Clone
+        run: |
+          bzr branch lp:libvterm
+
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          ref: libvterm
+          path: libvterm/new_git_repo
+
+      - name: Convert to git
+        run: |
+          cd libvterm
+          ../bzr2git
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add ../last_rev_checked_out
+          git diff --quiet && git diff --staged --quiet || git commit -m "Check out new rev"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          directory: libvterm/new_git_repo
+          branch: libvterm
+          tags: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}

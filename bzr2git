@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# bzr2git
+
+# (c) Gabriele Bozzola 2022
+# (c) Tobias Frost 2009. Released under the GPL3.
+# http://blog.coldtobi.de
+
+# This script takes a bazaar (bzr) repository and makes a git repository out of
+# it. The current dir should be the bzw one, the git one is created in
+# new_git_repo.
+#
+# To commit to a different git branch, just remove the exit 1 below and before
+# invoking the script, create the branch manually in git and change to it.
+# (note: this is untested, but should work)
+
+# NOTE: !!!ALWAYS USE BACKUPS!!! THIS SCRIPT MIGHT HAVE AN ERROR
+# WHICH TRIGGERS DOOMSDAY
+
+
+if [[ -e rev_to_merge ]]
+then
+  echo "rev_to_merge exits. Please remove it or edit this script"
+  exit 1
+fi
+
+last_rev_file="../last_rev_checked_out"
+
+last_rev_checked_out=$(cat $last_rev_file)
+
+last_rev_to_checkout=$(bzr log | grep "revno" | head -n 1 | cut -c8-)
+
+for (( j=$last_rev_checked_out; j<$last_rev_to_checkout ; j++ ))
+do
+    # Here you can pimp the revision to be checked out in order to manually merge
+    # some branch...
+    # e.g i="32.1.$j" to get the branch 32.1.x
+    i=$j
+    # check for log and determine if rev exists....
+    bzr log --revision $i 2>/dev/null | tail -n +7 | cut -c3- > /tmp/revlog  || exit 1
+    echo >>/tmp/revlog
+    echo "original bzr status:" >>/tmp/revlog
+    bzr log -r $i | tail -n +2 | head -n 4 >>/tmp/revlog
+
+    #extract author and date
+    NAME=$(bzr log -r $i | grep ^committer: | cut -c12- | awk -F "<" '{print $1}')
+    AUTHOR=$(bzr log -r $i | grep ^committer: | cut -c12-)
+    EMAIL=$(bzr log -r 1 | grep ^committer: | cut -c12- | awk -F "<" '{print $2}' | rev | cut -c2- | rev)
+    export GIT_COMMITTER_DATE=""
+    export GIT_COMMITTER_DATE=$(bzr log -r $i | grep ^timestamp: | cut -c12-)
+    export GIT_AUTHOR_DATE=$GIT_COMMITTER_DATE
+    echo $GIT_COMMITTER_DATE
+
+    [[ "x$AUTHOR" == "x" ]] && AUTHOR="unknown"
+
+    echo "Extracting rev $i"
+    # see if there is a tag associated with this revision
+    # sed: expr1 -> remove revision number
+    #      expr2 -> remove trailing blanks
+    #	   expr3 -> replace blanks with underscores
+    TAGS=$(bzr tags -r $i | sed -e "s/\(.*\).$i/\1/g" -e 's/[ \t]*$//' -e "s/\(.*\)/\'\1\'/g" -e "s/[[:blank:]]/_/g")
+    if [[ "x$TAGS" != "x" ]]
+    then
+	echo "TAGS detected."
+	echo TAGS $TAGS || hexdump -C
+
+    fi
+
+    bzr branch --revision $i . rev_to_merge || exit 1
+
+    # make sure that we update the gitignore as well.
+    rm -rf new_git_repo/* # remove old files or mv will complain
+    # mv -f rev_to_merge/.bzrignore new_git_repo/.gitignore
+    mv -f rev_to_merge/* new_git_repo/ || exit 1
+
+    # do the commit
+    git config --global user.name "$NAME"
+    git config --global user.email "$EMAIL"
+
+    ( cd new_git_repo && git add -A ) || exit 1
+    ( cd new_git_repo && git commit --author "$AUTHOR" --allow-empty -F /tmp/revlog ) || exit 1
+
+   if [[ "x$TAGS" != "x" ]]
+   then
+    for t in $TAGS
+      do
+	   echo "CREATING TAG $t"
+	   ( cd new_git_repo && git tag -a $t -m "Autoimported tag $t from bzr repository" ) || exit 1
+      done
+    fi
+    # remove the staging dir
+    rm -rf rev_to_merge || exit 1
+done
+
+echo "$last_rev_to_checkout" > $last_rev_file
