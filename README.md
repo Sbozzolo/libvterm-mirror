@@ -5,3 +5,5 @@ It uses GitHub actions to convert the Bazaar repo to a git one. It runs daily.
 
 GitHub disables scheduled actions if there are no updates to a repo in 60 days,
 so, occasionally this repo has to be manually updated.
+
+Last update: 13/06/2022
