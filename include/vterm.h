@@ -437,6 +437,8 @@ typedef struct {
   int (*resize)(int rows, int cols, VTermStateFields *fields, void *user);
   int (*setlineinfo)(int row, const VTermLineInfo *newinfo, const VTermLineInfo *oldinfo, void *user);
   int (*sb_clear)(void *user);
+  // ABI-compat only enabled if vterm_state_callbacks_has_premove() is invoked
+  int (*premove)(VTermRect dest, void *user);
 } VTermStateCallbacks;
 
 typedef struct {
@@ -458,6 +460,8 @@ VTermState *vterm_obtain_state(VTerm *vt);
 
 void  vterm_state_set_callbacks(VTermState *state, const VTermStateCallbacks *callbacks, void *user);
 void *vterm_state_get_cbdata(VTermState *state);
+
+void vterm_state_callbacks_has_premove(VTermState *state);
 
 void  vterm_state_set_unrecognised_fallbacks(VTermState *state, const VTermStateFallbacks *fallbacks, void *user);
 void *vterm_state_get_unrecognised_fbdata(VTermState *state);
