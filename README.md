@@ -7,6 +7,6 @@ GitHub disables scheduled actions if there are no updates to a repo in 60 days,
 so, occasionally this repo has to be manually updated. If you know how to avoid
 this, please open a PR.
 
-Last update: 01/12/2024
+Last update: 31/01/2025
 
 
